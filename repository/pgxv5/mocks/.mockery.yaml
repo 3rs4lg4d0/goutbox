@@ -1,0 +1,12 @@
+with-expecter: true
+dir: .
+outpkg: mocks
+filename: "{{.InterfaceName}}_mock.go"
+packages:
+    github.com/3rs4lg4d0/goutbox/repository/pgxv5:
+        interfaces:
+            dbpool:
+    github.com/jackc/pgx/v5:
+        interfaces:
+            Tx:
+            Rows:
