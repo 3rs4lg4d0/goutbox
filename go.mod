@@ -1,6 +1,6 @@
 module github.com/3rs4lg4d0/goutbox
 
-go 1.21.1
+go 1.20
 
 require (
 	github.com/confluentinc/confluent-kafka-go v1.9.2

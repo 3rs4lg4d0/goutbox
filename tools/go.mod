@@ -1,8 +1,6 @@
 module github.com/3rs4lg4d0/goutbox/tools
 
-go 1.21
-
-toolchain go1.21.1
+go 1.20
 
 require (
 	github.com/golang-migrate/migrate/v4 v4.17.0
