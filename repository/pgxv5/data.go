@@ -2,17 +2,16 @@ package pgxv5
 
 import (
 	"fmt"
-	"time"
 
-	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5/pgtype"
 )
 
 type outboxLock struct {
 	id          int
 	locked      bool
-	lockedBy    uuid.UUID
-	lockedAt    time.Time
-	lockedUntil time.Time
+	lockedBy    pgtype.UUID
+	lockedAt    pgtype.Timestamp
+	lockedUntil pgtype.Timestamp
 	version     int64
 }
 
@@ -27,7 +26,7 @@ func (o *outboxLock) String() string {
 
 type dispatcherSubscription struct {
 	id           int
-	dispatcherId uuid.UUID
-	aliveAt      time.Time
+	dispatcherId pgtype.UUID
+	aliveAt      pgtype.Timestamp
 	version      int64
 }
