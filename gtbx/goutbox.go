@@ -32,7 +32,9 @@ func WithLogger(l Logger) opt {
 // for observability.
 func WithOnSuccessCounter(co Counter) opt {
 	return func(o *Goutbox) {
-		o.successCtr = co
+		if co != nil {
+			o.successCtr = co
+		}
 	}
 }
 
@@ -40,7 +42,9 @@ func WithOnSuccessCounter(co Counter) opt {
 // for observability.
 func WithOnErrorCounter(co Counter) opt {
 	return func(o *Goutbox) {
-		o.errorCtr = co
+		if co != nil {
+			o.errorCtr = co
+		}
 	}
 }
 
@@ -76,7 +80,7 @@ func Singleton(s Settings, r Repository, e Emitter, options ...opt) *Goutbox {
 		}
 
 		if s.EnableDispatcher {
-			g.logger.Debug("The polling publisher dispatcher is enabled")
+			g.logger.Debug("the polling publisher dispatcher is enabled")
 			d := dispatcher{
 				id:         uuid.New(),
 				settings:   s,
