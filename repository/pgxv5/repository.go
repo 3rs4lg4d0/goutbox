@@ -84,10 +84,12 @@ func (r *Repository) AcquireLock(dispatcherId uuid.UUID) (bool, error) {
 	if err != nil {
 		return false, err
 	}
-	if lock.locked && lock.lockedUntil.After(time.Now()) {
+	if lock.locked && lock.lockedUntil.Time.After(time.Now()) {
 		return false, nil
 	}
-	ct, err := r.db.Exec(ctx, acquireLockSql, lock.lockedBy, lock.lockedAt, lock.lockedUntil.Add(30*time.Second), lock.version+1, lock.version)
+	lockedAt := time.Now()
+	lockedUntil := lockedAt.Add(30 * time.Second)
+	ct, err := r.db.Exec(ctx, acquireLockSql, dispatcherId, lockedAt, lockedUntil, lock.version+1, lock.version)
 	if err != nil {
 		return false, err
 	}
@@ -95,7 +97,7 @@ func (r *Repository) AcquireLock(dispatcherId uuid.UUID) (bool, error) {
 	if ct.RowsAffected() == 0 {
 		return false, errors.New("race condition detected during the optimistic locking")
 	}
-
+	r.logger.Debug(fmt.Sprintf("the lock was acquired by %s", dispatcherId.String()))
 	return true, nil
 }
 
@@ -107,13 +109,14 @@ func (r *Repository) ReleaseLock(dispatcherId uuid.UUID) error {
 	if err != nil {
 		return err
 	}
-	if !lock.locked || lock.lockedBy.String() != dispatcherId.String() {
+	if !lock.locked || uuid.UUID(lock.lockedBy.Bytes).String() != dispatcherId.String() {
 		r.logger.Error(fmt.Sprintf("the lock should be locked by me (dispatcher=%s)", dispatcherId), fmt.Errorf("unexpected lock status: %s", lock))
 	}
 	_, err = r.db.Exec(ctx, releaseLockSql)
 	if err != nil {
 		return err
 	}
+	r.logger.Debug(fmt.Sprintf("the lock was released by %s", dispatcherId.String()))
 	return nil
 }
 
@@ -247,7 +250,7 @@ func (r *Repository) UpdateSubscription(dispatcherId uuid.UUID) error {
 	ctx := context.Background()
 	ct, err := r.db.Exec(ctx, updateSubscriptionSql, dispatcherId)
 	if ct.RowsAffected() == 0 {
-		r.logger.Warn(fmt.Sprintf("The dispatcher '%s' has no active subscription!", dispatcherId.String()))
+		r.logger.Warn(fmt.Sprintf("the dispatcher '%s' has no active subscription!", dispatcherId.String()))
 	}
 	return err
 }
@@ -268,7 +271,7 @@ func allocateSubscription(dss []dispatcherSubscription) (int, *dispatcherSubscri
 // isExpired considers expired the subscriptions whose dispatcher last aliveAt mark
 // is above 30 seconds from current time.
 func isExpired(ds dispatcherSubscription) bool {
-	return ds.aliveAt.Add(time.Second * 30).Before(time.Now())
+	return ds.aliveAt.Time.Add(time.Second * 30).Before(time.Now())
 }
 
 // getOutboxLockRow returns the only 'outbox_lock' table row.
