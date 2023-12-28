@@ -34,5 +34,5 @@ type Repository interface {
 
 	// UpdateSubscription updates the dispatcher subscription to prevent potential
 	// thefts by other dispatchers.
-	UpdateSubscription(dispatcherId uuid.UUID) error
+	UpdateSubscription(dispatcherId uuid.UUID) (updated bool, err error)
 }

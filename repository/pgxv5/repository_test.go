@@ -164,7 +164,7 @@ func TestSave(t *testing.T) {
 				},
 			},
 			wantErr:    true,
-			wantErrMsg: "a pgx transaction was expected",
+			wantErrMsg: "a pgx.Tx transaction was expected",
 		},
 		{
 			name: "simulate error when inserting an outbox row",
@@ -245,8 +245,8 @@ func TestSubscribeDispatcher(t *testing.T) {
 				for i := 1; i <= 4; i++ {
 					pool.Exec(
 						context.Background(),
-						"INSERT INTO outbox_dispatcher_subscription (id, dispatcher_id, alive_at) VALUES ($1, $2, $3)",
-						i, uuid.New(), time.Now())
+						"INSERT INTO outbox_dispatcher_subscription (id, dispatcher_id, alive_at, version) VALUES ($1, $2, $3, $4)",
+						i, uuid.New(), time.Now(), 1)
 				}
 			},
 			wantSuccess:          false,
@@ -267,25 +267,13 @@ func TestSubscribeDispatcher(t *testing.T) {
 					}
 					pool.Exec(
 						context.Background(),
-						"INSERT INTO outbox_dispatcher_subscription (id, dispatcher_id, alive_at) VALUES ($1, $2, $3)",
-						i, uuid.New(), now)
+						"INSERT INTO outbox_dispatcher_subscription (id, dispatcher_id, alive_at, version) VALUES ($1, $2, $3, $4)",
+						i, uuid.New(), now, 1)
 				}
 			},
 			wantSuccess:          true,
 			expectedSubscription: 2,
 			wantErr:              false,
-		},
-		{
-			name: "simulate error when beginning transaction",
-			args: args{
-				maxDispatchers: 2,
-			},
-			mockExpectations: func(t *testing.T, mock *mocks.Mockdbpool) {
-				ctx := context.Background()
-				mock.EXPECT().Begin(ctx).Return(nil, errors.New("error#1"))
-			},
-			wantErr:    true,
-			wantErrMsg: "error#1",
 		},
 		{
 			name: "simulate error when quering subscriptions",
@@ -294,10 +282,7 @@ func TestSubscribeDispatcher(t *testing.T) {
 			},
 			mockExpectations: func(t *testing.T, mock *mocks.Mockdbpool) {
 				ctx := context.Background()
-				mockedTx := mocks.NewMockTx(t)
-				mockedTx.EXPECT().Query(ctx, getSubscriptionsSql).Return(nil, errors.New("error#2"))
-				mock.EXPECT().Begin(ctx).Return(mockedTx, nil)
-				mockedTx.EXPECT().Rollback(ctx).Return(nil)
+				mock.EXPECT().Query(ctx, getSubscriptionsSql).Return(nil, errors.New("error#2"))
 			},
 			wantErr:    true,
 			wantErrMsg: "error#2",
@@ -312,12 +297,9 @@ func TestSubscribeDispatcher(t *testing.T) {
 				rows := mocks.NewMockRows(t)
 				rows.EXPECT().Next().Return(true).Once()
 				var ds dispatcherSubscription
-				rows.EXPECT().Scan(&ds.id, &ds.dispatcherId, &ds.aliveAt).Return(errors.New("error#3"))
+				rows.EXPECT().Scan(&ds.id, &ds.dispatcherId, &ds.aliveAt, &ds.version).Return(errors.New("error#3"))
 				rows.EXPECT().Close()
-				mockedTx := mocks.NewMockTx(t)
-				mockedTx.EXPECT().Query(ctx, getSubscriptionsSql).Return(rows, nil)
-				mock.EXPECT().Begin(ctx).Return(mockedTx, nil)
-				mockedTx.EXPECT().Rollback(ctx).Return(nil)
+				mock.EXPECT().Query(ctx, getSubscriptionsSql).Return(rows, nil)
 			},
 			wantErr:    true,
 			wantErrMsg: "error#3",
@@ -333,10 +315,7 @@ func TestSubscribeDispatcher(t *testing.T) {
 				rows.EXPECT().Next().Return(false).Once()
 				rows.EXPECT().Err().Return(errors.New("error#4"))
 				rows.EXPECT().Close()
-				mockedTx := mocks.NewMockTx(t)
-				mockedTx.EXPECT().Query(ctx, getSubscriptionsSql).Return(rows, nil)
-				mock.EXPECT().Begin(ctx).Return(mockedTx, nil)
-				mockedTx.EXPECT().Rollback(ctx).Return(nil)
+				mock.EXPECT().Query(ctx, getSubscriptionsSql).Return(rows, nil)
 			},
 			wantErr:    true,
 			wantErrMsg: "error#4",
@@ -352,35 +331,11 @@ func TestSubscribeDispatcher(t *testing.T) {
 				rows.EXPECT().Next().Return(false).Once()
 				rows.EXPECT().Err().Return(nil)
 				rows.EXPECT().Close()
-				mockedTx := mocks.NewMockTx(t)
-				mockedTx.EXPECT().Query(ctx, getSubscriptionsSql).Return(rows, nil)
-				mockedTx.EXPECT().Exec(ctx, subscribeDispatcherSql, mock.Anything, mock.Anything, mock.Anything).Return(pgconn.CommandTag{}, errors.New("error#5"))
-				m.EXPECT().Begin(ctx).Return(mockedTx, nil)
-				mockedTx.EXPECT().Rollback(ctx).Return(nil)
+				m.EXPECT().Query(ctx, getSubscriptionsSql).Return(rows, nil)
+				m.EXPECT().Exec(ctx, subscribeDispatcherInsertSql, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(pgconn.CommandTag{}, errors.New("error#5"))
 			},
 			wantErr:    true,
 			wantErrMsg: "error#5",
-		},
-		{
-			name: "simulate error when commiting",
-			args: args{
-				maxDispatchers: 2,
-			},
-			mockExpectations: func(t *testing.T, m *mocks.Mockdbpool) {
-				ctx := context.Background()
-				rows := mocks.NewMockRows(t)
-				rows.EXPECT().Next().Return(false).Once()
-				rows.EXPECT().Err().Return(nil)
-				rows.EXPECT().Close()
-				mockedTx := mocks.NewMockTx(t)
-				mockedTx.EXPECT().Query(ctx, getSubscriptionsSql).Return(rows, nil)
-				mockedTx.EXPECT().Exec(ctx, subscribeDispatcherSql, mock.Anything, mock.Anything, mock.Anything).Return(pgconn.CommandTag{}, nil)
-				mockedTx.EXPECT().Commit(ctx).Return(errors.New("error#6"))
-				m.EXPECT().Begin(ctx).Return(mockedTx, nil)
-				mockedTx.EXPECT().Rollback(ctx).Return(nil)
-			},
-			wantErr:    true,
-			wantErrMsg: "error#6",
 		},
 	}
 	for _, tc := range testcases {

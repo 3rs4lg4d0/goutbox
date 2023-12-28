@@ -1,6 +1,7 @@
 package gtbx
 
 import (
+	"errors"
 	"fmt"
 	"sync"
 	"time"
@@ -36,9 +37,12 @@ func (d *dispatcher) launchDispatcher() {
 				d.logger.Error(fmt.Sprintf("trying to subscribe dispatcher '%s'", d.id), err)
 			}
 		} else {
-			err := d.repository.UpdateSubscription(d.id)
+			updated, err := d.repository.UpdateSubscription(d.id)
 			if err != nil {
 				d.logger.Error("updating subscription", err)
+			} else if updated == false {
+				d.logger.Error("subscription not updated", errors.New("stolen subscription!"))
+				subscribed = false
 			}
 		}
 	}
@@ -55,8 +59,7 @@ func (d *dispatcher) executeDispatcherLoop() {
 				d.logger.Error("releasing the outbox lock", err)
 			}
 		} else if err != nil {
-			d.logger.Debug("the lock is in use right now ¯\\_(ツ)_/¯")
-			d.logger.Debug(err.Error())
+			d.logger.Error("unable to get the lock", err)
 		}
 	}
 }
@@ -126,7 +129,7 @@ func (d *dispatcher) processOutbox() {
 	// We can safely close the channel because this is a dedicated channel only to
 	// receive as many delivery reports as many messages are sent.
 	close(deliveryChan)
-	d.logger.Debug(fmt.Sprintf("%d messages where successfully delivered (with %d failed) from a total of %d processed from outbox", len(success), totalErr, totalProcessed))
+	d.logger.Info(fmt.Sprintf("%d messages were successfully delivered (with %d failed) from a total of %d processed from outbox", len(success), totalErr, totalProcessed))
 
 	if len(success) > 0 {
 		d.logger.Debug(fmt.Sprintf("Deleting %d elements from outbox", len(success)))

@@ -6,11 +6,11 @@ import (
 )
 
 type Counter struct {
-	counter tally.Counter
+	Counter tally.Counter
 }
 
 var _ gtbx.Counter = (*Counter)(nil)
 
 func (c *Counter) Inc(delta int64) {
-	c.counter.Inc(delta)
+	c.Counter.Inc(delta)
 }

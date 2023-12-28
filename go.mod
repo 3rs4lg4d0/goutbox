@@ -1,6 +1,8 @@
 module github.com/3rs4lg4d0/goutbox
 
-go 1.20
+go 1.21
+
+toolchain go1.21.5
 
 require (
 	github.com/confluentinc/confluent-kafka-go v1.9.2
@@ -14,6 +16,7 @@ require (
 	github.com/testcontainers/testcontainers-go v0.26.0
 	github.com/testcontainers/testcontainers-go/modules/postgres v0.26.0
 	github.com/uber-go/tally/v4 v4.1.10
+	gorm.io/gorm v1.25.5
 )
 
 require (
@@ -36,6 +39,8 @@ require (
 	github.com/jackc/pgpassfile v1.0.0 // indirect
 	github.com/jackc/pgservicefile v0.0.0-20221227161230-091c0ba34f0a // indirect
 	github.com/jackc/puddle/v2 v2.2.1 // indirect
+	github.com/jinzhu/inflection v1.0.0 // indirect
+	github.com/jinzhu/now v1.1.5 // indirect
 	github.com/klauspost/compress v1.16.0 // indirect
 	github.com/lufia/plan9stats v0.0.0-20211012122336-39d0f177ccd0 // indirect
 	github.com/magiconair/properties v1.8.7 // indirect
