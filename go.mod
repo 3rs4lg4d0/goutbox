@@ -5,6 +5,7 @@ go 1.21
 toolchain go1.21.5
 
 require (
+	github.com/DATA-DOG/go-sqlmock v1.5.1
 	github.com/confluentinc/confluent-kafka-go v1.9.2
 	github.com/google/uuid v1.4.0
 	github.com/iancoleman/strcase v0.3.0
@@ -16,6 +17,7 @@ require (
 	github.com/testcontainers/testcontainers-go v0.26.0
 	github.com/testcontainers/testcontainers-go/modules/postgres v0.26.0
 	github.com/uber-go/tally/v4 v4.1.10
+	gorm.io/driver/postgres v1.5.4
 	gorm.io/gorm v1.25.5
 )
 

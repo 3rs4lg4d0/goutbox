@@ -5,7 +5,6 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
-	"math"
 	"strings"
 	"time"
 
@@ -21,7 +20,7 @@ const (
 	getOutboxEntriesSql          = "SELECT * from outbox ORDER BY created_at ASC"
 	insertOutboxSql              = "INSERT INTO outbox (id, aggregate_type, aggregate_id, event_type, payload) VALUES (?, ?, ?, ?, ?)"
 	subscribeDispatcherInsertSql = "INSERT INTO outbox_dispatcher_subscription (id, dispatcher_id, alive_at, version) VALUES (?, ?, ?, 1)"
-	subscribeDispatcherUpdateSql = "UPDATE outbox_dispatcher_subscription SET dispatcher_id=?, alive_at=?, version=? WHERE version=?"
+	subscribeDispatcherUpdateSql = "UPDATE outbox_dispatcher_subscription SET dispatcher_id=?, alive_at=?, version=? WHERE id=? AND version=?"
 	acquireLockSql               = "UPDATE outbox_lock SET locked=true, locked_by=?, locked_at=?, locked_until=?, version=? WHERE version=?"
 	releaseLockSql               = "UPDATE outbox_lock SET locked=false, locked_by=null, locked_at=null, locked_until=null"
 	updateSubscriptionSql        = "UPDATE outbox_dispatcher_subscription SET alive_at=NOW() WHERE dispatcher_id=?"
@@ -60,7 +59,7 @@ func (r *Repository) SetLogger(l gtbx.Logger) {
 func (r *Repository) Save(ctx context.Context, o *gtbx.Outbox) error {
 	tx, ok := ctx.Value(r.txKey).(*gorm.DB)
 	if !ok {
-		return errors.New("an *gorm.DB transaction was expected")
+		return errors.New("a *gorm.DB transaction was expected")
 	}
 	err := tx.Exec(insertOutboxSql, uuid.New(), o.AggregateType, o.AggregateId, o.EventType, o.Payload).Error
 	if err != nil {
@@ -134,19 +133,18 @@ func (r *Repository) FindInBatches(batchSize int, limit int, fc func([]*gtbx.Out
 			return err
 		}
 		ors = append(ors, &or)
+		if len(ors) == batchSize {
+			if err := fc(ors); err != nil {
+				return err
+			}
+			ors = nil
+		}
 	}
 	if err := rows.Err(); err != nil {
 		return err
 	}
-
-	batchSize = int(math.Min(float64(batchSize), float64(len(ors))))
-	for i := 0; i < len(ors); i += batchSize {
-		end := i + batchSize
-		if end > len(ors) {
-			end = len(ors)
-		}
-		batch := ors[i:end]
-		if err := fc(batch); err != nil {
+	if len(ors) > 0 {
+		if err := fc(ors); err != nil {
 			return err
 		}
 	}
@@ -213,7 +211,7 @@ func (r *Repository) SubscribeDispatcher(dispatcherId uuid.UUID, maxDispatchers 
 	}
 	now := time.Now()
 	if ds != nil {
-		res := r.db.Exec(subscribeDispatcherUpdateSql, dispatcherId, now, ds.Version+1, ds.Version)
+		res := r.db.Exec(subscribeDispatcherUpdateSql, dispatcherId, now, ds.Version+1, ds.ID, ds.Version)
 		if res.Error != nil {
 			return false, 0, res.Error
 		}

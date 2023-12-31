@@ -33,5 +33,5 @@ CREATE TABLE outbox_dispatcher_subscription (
     version      BIGINT                    NOT NULL -- Version number for optimistic locking
 );
 
--- Index on the created_at column for optimizing queries based on creation time
+-- Index on the dispatcher_id column for optimizing queries
 CREATE INDEX idx_ods_dispatcher_id ON outbox_dispatcher_subscription (dispatcher_id);

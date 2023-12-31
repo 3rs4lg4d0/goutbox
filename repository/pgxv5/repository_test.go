@@ -11,6 +11,7 @@ import (
 
 	"github.com/3rs4lg4d0/goutbox/gtbx"
 	"github.com/3rs4lg4d0/goutbox/repository/pgxv5/mocks"
+	"github.com/3rs4lg4d0/goutbox/test"
 	"github.com/google/uuid"
 	"github.com/integralist/go-findroot/find"
 	"github.com/jackc/pgx/v5"
@@ -26,10 +27,9 @@ import (
 )
 
 var (
-	database      *postgres.PostgresContainer
-	pool          *pgxpool.Pool
-	repository    *Repository
-	defaultCtxKey gtbx.TxKey = "myKey"
+	database   *postgres.PostgresContainer
+	pool       *pgxpool.Pool
+	repository *Repository
 )
 
 // TestMain prepares the database setup needed to run these tests. As you can see
@@ -60,7 +60,7 @@ func TestMain(m *testing.M) {
 	}
 	defer pool.Close()
 
-	repository = New(defaultCtxKey, pool)
+	repository = New(test.DefaultCtxKey, pool)
 	repository.SetLogger(&gtbx.NopLogger{})
 	code := m.Run()
 
@@ -84,7 +84,7 @@ func TestNew(t *testing.T) {
 		{
 			name: "valid txKey and valid pool",
 			args: args{
-				txKey: defaultCtxKey,
+				txKey: test.DefaultCtxKey,
 				pool:  pool,
 			},
 			wantPanic: false,
@@ -99,7 +99,7 @@ func TestNew(t *testing.T) {
 		{
 			name: "pool is nil",
 			args: args{
-				txKey: defaultCtxKey,
+				txKey: test.DefaultCtxKey,
 				pool:  nil,
 			},
 			wantPanic: true,
@@ -138,7 +138,7 @@ func TestSave(t *testing.T) {
 				ctx: func() context.Context {
 					parentCtx := context.Background()
 					tx, _ := pool.Begin(parentCtx)
-					ctx := context.WithValue(parentCtx, defaultCtxKey, tx)
+					ctx := context.WithValue(parentCtx, test.DefaultCtxKey, tx)
 					return ctx
 				}(),
 				record: gtbx.Outbox{
@@ -204,7 +204,7 @@ func TestSave(t *testing.T) {
 				assert.Equal(t, tc.wantErrMsg, err.Error())
 			}
 
-			tx, ok := ctx.Value(defaultCtxKey).(pgx.Tx)
+			tx, ok := ctx.Value(test.DefaultCtxKey).(pgx.Tx)
 			if ok {
 				err = tx.Rollback(ctx)
 				assert.NoError(t, err)
@@ -389,12 +389,12 @@ func injectMockedPgxTransaction(ctx context.Context) (context.Context, pgxmock.P
 	mockedConn, _ := pgxmock.NewConn()
 	mockedConn.ExpectBegin() // required; if not the next line returns nil
 	tx, _ := mockedConn.Begin(ctx)
-	return context.WithValue(ctx, defaultCtxKey, tx), mockedConn
+	return context.WithValue(ctx, test.DefaultCtxKey, tx), mockedConn
 }
 
 func createMockRepository(t *testing.T) (*Repository, *mocks.Mockdbpool) {
 	mockedPool := mocks.NewMockdbpool(t)
-	repository := New(defaultCtxKey, mockedPool)
+	repository := New(test.DefaultCtxKey, mockedPool)
 	repository.SetLogger(&gtbx.NopLogger{})
 	return repository, mockedPool
 }

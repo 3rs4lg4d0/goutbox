@@ -5,7 +5,7 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
-	"math"
+	"strconv"
 	"strings"
 	"time"
 
@@ -13,38 +13,52 @@ import (
 	"github.com/google/uuid"
 )
 
-const (
+const raNotSupported string = "RowsAffected not supported"
+
+var (
 	getSubscriptionsSql          = "SELECT * FROM outbox_dispatcher_subscription ORDER BY id ASC"
 	getOutboxLockRowSql          = "SELECT * from outbox_lock WHERE id=1"
 	getOutboxEntriesWithLimitSql = "SELECT * from outbox ORDER BY created_at ASC LIMIT ?"
 	getOutboxEntriesSql          = "SELECT * from outbox ORDER BY created_at ASC"
 	insertOutboxSql              = "INSERT INTO outbox (id, aggregate_type, aggregate_id, event_type, payload) VALUES (?, ?, ?, ?, ?)"
 	subscribeDispatcherInsertSql = "INSERT INTO outbox_dispatcher_subscription (id, dispatcher_id, alive_at, version) VALUES (?, ?, ?, 1)"
-	subscribeDispatcherUpdateSql = "UPDATE outbox_dispatcher_subscription SET dispatcher_id=?, alive_at=?, version=? WHERE version=?"
+	subscribeDispatcherUpdateSql = "UPDATE outbox_dispatcher_subscription SET dispatcher_id=?, alive_at=?, version=? WHERE id=? AND version=?"
 	acquireLockSql               = "UPDATE outbox_lock SET locked=true, locked_by=?, locked_at=?, locked_until=?, version=? WHERE version=?"
 	releaseLockSql               = "UPDATE outbox_lock SET locked=false, locked_by=null, locked_at=null, locked_until=null"
 	updateSubscriptionSql        = "UPDATE outbox_dispatcher_subscription SET alive_at=NOW() WHERE dispatcher_id=?"
 )
 
 type Repository struct {
-	txKey  gtbx.TxKey
-	db     *sql.DB
-	logger gtbx.Logger
+	txKey     gtbx.TxKey
+	db        *sql.DB
+	useDollar bool
+	logger    gtbx.Logger
 }
 
 var _ gtbx.Loggable = (*Repository)(nil)
 var _ gtbx.Repository = (*Repository)(nil)
 
-func New(txKey gtbx.TxKey, db *sql.DB) *Repository {
+func New(txKey gtbx.TxKey, db *sql.DB, useDollar bool) *Repository {
 	if txKey == nil {
 		panic("txKey is mandatory")
 	}
 	if db == nil {
 		panic("db is mandatory")
 	}
+
+	if useDollar {
+		getOutboxEntriesWithLimitSql = convertToDollarPlaceholder(getOutboxEntriesWithLimitSql)
+		insertOutboxSql = convertToDollarPlaceholder(insertOutboxSql)
+		subscribeDispatcherInsertSql = convertToDollarPlaceholder(subscribeDispatcherInsertSql)
+		subscribeDispatcherUpdateSql = convertToDollarPlaceholder(subscribeDispatcherUpdateSql)
+		acquireLockSql = convertToDollarPlaceholder(acquireLockSql)
+		updateSubscriptionSql = convertToDollarPlaceholder(updateSubscriptionSql)
+	}
+
 	return &Repository{
-		txKey: txKey,
-		db:    db,
+		txKey:     txKey,
+		db:        db,
+		useDollar: useDollar,
 	}
 }
 
@@ -88,7 +102,7 @@ func (r *Repository) AcquireLock(dispatcherId uuid.UUID) (bool, error) {
 
 	ra, err := res.RowsAffected()
 	if err != nil {
-		return false, errors.New("RowsAffected not supported")
+		return false, errors.New(raNotSupported)
 	}
 	if ra == 0 {
 		return false, errors.New("race condition detected during the optimistic locking")
@@ -139,19 +153,18 @@ func (r *Repository) FindInBatches(batchSize int, limit int, fc func([]*gtbx.Out
 			return err
 		}
 		ors = append(ors, &or)
+		if len(ors) == batchSize {
+			if err := fc(ors); err != nil {
+				return err
+			}
+			ors = nil
+		}
 	}
 	if err := rows.Err(); err != nil {
 		return err
 	}
-
-	batchSize = int(math.Min(float64(batchSize), float64(len(ors))))
-	for i := 0; i < len(ors); i += batchSize {
-		end := i + batchSize
-		if end > len(ors) {
-			end = len(ors)
-		}
-		batch := ors[i:end]
-		if err := fc(batch); err != nil {
+	if len(ors) > 0 {
+		if err := fc(ors); err != nil {
 			return err
 		}
 	}
@@ -170,8 +183,14 @@ func (r *Repository) DeleteInBatches(batchSize int, records []uuid.UUID) error {
 
 		query := "DELETE FROM outbox WHERE id IN ("
 		placeholders := make([]string, len(batch))
-		for i := range placeholders {
-			placeholders[i] = "?"
+		if r.useDollar {
+			for i := range placeholders {
+				placeholders[i] = "$" + strconv.Itoa(i+1)
+			}
+		} else {
+			for i := range placeholders {
+				placeholders[i] = "?"
+			}
 		}
 		query += strings.Join(placeholders, ",") + ")"
 		values := make([]interface{}, len(batch))
@@ -219,13 +238,13 @@ func (r *Repository) SubscribeDispatcher(dispatcherId uuid.UUID, maxDispatchers 
 	}
 	now := time.Now()
 	if ds != nil {
-		res, err := r.db.Exec(subscribeDispatcherUpdateSql, dispatcherId, now, ds.version+1, ds.version)
+		res, err := r.db.Exec(subscribeDispatcherUpdateSql, dispatcherId, now, ds.version+1, ds.id, ds.version)
 		if err != nil {
 			return false, 0, err
 		}
 		ra, err := res.RowsAffected()
 		if err != nil {
-			return false, 0, errors.New("RowsAffected not supported")
+			return false, 0, errors.New(raNotSupported)
 		}
 		if ra == 0 {
 			return false, 0, errors.New("race condition detected during the optimistic locking")
@@ -249,7 +268,7 @@ func (r *Repository) UpdateSubscription(dispatcherId uuid.UUID) (bool, error) {
 	}
 	ra, err := res.RowsAffected()
 	if err != nil {
-		return false, errors.New("RowsAffected not supported")
+		return false, errors.New(raNotSupported)
 	}
 	if ra == 0 {
 		r.logger.Warn(fmt.Sprintf("the dispatcher '%s' has no active subscription!", dispatcherId.String()))
@@ -286,4 +305,13 @@ func (r *Repository) getOutboxLockRow() (*outboxLock, error) {
 		return nil, err
 	}
 	return &lock, nil
+}
+
+func convertToDollarPlaceholder(query string) string {
+	count := 0
+	for strings.Contains(query, "?") {
+		count++
+		query = strings.Replace(query, "?", fmt.Sprintf("$%d", count), 1)
+	}
+	return query
 }

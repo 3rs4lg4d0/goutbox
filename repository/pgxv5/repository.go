@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"math"
 	"reflect"
 	"strconv"
 	"strings"
@@ -23,7 +22,7 @@ const (
 	getOutboxEntriesSql          = "SELECT * from outbox ORDER BY created_at ASC"
 	insertOutboxSql              = "INSERT INTO outbox (id, aggregate_type, aggregate_id, event_type, payload) VALUES ($1, $2, $3, $4, $5)"
 	subscribeDispatcherInsertSql = "INSERT INTO outbox_dispatcher_subscription (id, dispatcher_id, alive_at, version) VALUES ($1, $2, $3, 1)"
-	subscribeDispatcherUpdateSql = "UPDATE outbox_dispatcher_subscription SET dispatcher_id=$1, alive_at=$2, version=$3 WHERE version=$4"
+	subscribeDispatcherUpdateSql = "UPDATE outbox_dispatcher_subscription SET dispatcher_id=$1, alive_at=$2, version=$3 WHERE id=$4 AND version=$5"
 	acquireLockSql               = "UPDATE outbox_lock SET locked=true, locked_by=$1, locked_at=$2, locked_until=$3, version=$4 WHERE version=$5"
 	releaseLockSql               = "UPDATE outbox_lock SET locked=false, locked_by=null, locked_at=null, locked_until=null"
 	updateSubscriptionSql        = "UPDATE outbox_dispatcher_subscription SET alive_at=NOW() WHERE dispatcher_id=$1"
@@ -149,19 +148,18 @@ func (r *Repository) FindInBatches(batchSize int, limit int, fc func([]*gtbx.Out
 			return err
 		}
 		ors = append(ors, &or)
+		if len(ors) == batchSize {
+			if err := fc(ors); err != nil {
+				return err
+			}
+			ors = nil
+		}
 	}
 	if err := rows.Err(); err != nil {
 		return err
 	}
-
-	batchSize = int(math.Min(float64(batchSize), float64(len(ors))))
-	for i := 0; i < len(ors); i += batchSize {
-		end := i + batchSize
-		if end > len(ors) {
-			end = len(ors)
-		}
-		batch := ors[i:end]
-		if err := fc(batch); err != nil {
+	if len(ors) > 0 {
+		if err := fc(ors); err != nil {
 			return err
 		}
 	}
@@ -231,7 +229,7 @@ func (r *Repository) SubscribeDispatcher(dispatcherId uuid.UUID, maxDispatchers 
 	}
 	now := time.Now()
 	if ds != nil {
-		ct, err := r.db.Exec(ctx, subscribeDispatcherUpdateSql, dispatcherId, now, ds.version+1, ds.version)
+		ct, err := r.db.Exec(ctx, subscribeDispatcherUpdateSql, dispatcherId, now, ds.version+1, ds.id, ds.version)
 		if err != nil {
 			return false, 0, err
 		}
