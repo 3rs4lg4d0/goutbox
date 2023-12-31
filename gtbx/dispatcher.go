@@ -40,7 +40,7 @@ func (d *dispatcher) launchDispatcher() {
 			updated, err := d.repository.UpdateSubscription(d.id)
 			if err != nil {
 				d.logger.Error("updating subscription", err)
-			} else if updated == false {
+			} else if !updated {
 				d.logger.Error("subscription not updated", errors.New("stolen subscription!"))
 				subscribed = false
 			}

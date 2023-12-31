@@ -233,10 +233,10 @@ func TestAcquireLock(t *testing.T) {
 				dispatcherId: uuid.New(),
 			},
 			preconditions: func() {
-				repository.AcquireLock(testDispatcherId)
+				repository.AcquireLock(testDispatcherId) //nolint:all
 			},
 			postconditions: func() {
-				repository.ReleaseLock(testDispatcherId)
+				repository.ReleaseLock(testDispatcherId) //nolint:all
 			},
 			wantAcquired: false,
 			wantErr:      false,
@@ -301,7 +301,7 @@ func TestAcquireLock(t *testing.T) {
 				assert.NoError(t, err)
 			}
 			if acquired {
-				repo.ReleaseLock(tc.args.dispatcherId)
+				repo.ReleaseLock(tc.args.dispatcherId) //nolint:all
 			}
 			if tc.postconditions != nil {
 				tc.postconditions()
@@ -329,7 +329,7 @@ func TestReleaseLock(t *testing.T) {
 				dispatcherId: testDispatcherId,
 			},
 			preconditions: func() {
-				repository.AcquireLock(testDispatcherId)
+				repository.AcquireLock(testDispatcherId) //nolint:all
 			},
 			wantErr: false,
 		},
@@ -835,7 +835,7 @@ func TestUpdateSubscription(t *testing.T) {
 				dispatcherId: testDispatcherId,
 			},
 			preconditions: func() {
-				repository.SubscribeDispatcher(testDispatcherId, 1)
+				repository.SubscribeDispatcher(testDispatcherId, 1) //nolint:all
 			},
 			postconditions: func() {
 				db.Exec("DELETE FROM outbox_dispatcher_subscription")

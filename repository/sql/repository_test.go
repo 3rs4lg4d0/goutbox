@@ -230,10 +230,10 @@ func TestAcquireLock(t *testing.T) {
 				dispatcherId: uuid.New(),
 			},
 			preconditions: func() {
-				repository.AcquireLock(testDispatcherId)
+				repository.AcquireLock(testDispatcherId) //nolint:all
 			},
 			postconditions: func() {
-				repository.ReleaseLock(testDispatcherId)
+				repository.ReleaseLock(testDispatcherId) //nolint:all
 			},
 			wantAcquired: false,
 			wantErr:      false,
@@ -311,7 +311,7 @@ func TestAcquireLock(t *testing.T) {
 				assert.NoError(t, err)
 			}
 			if acquired {
-				repo.ReleaseLock(tc.args.dispatcherId)
+				repo.ReleaseLock(tc.args.dispatcherId) //nolint:all
 			}
 			if tc.postconditions != nil {
 				tc.postconditions()
@@ -339,7 +339,7 @@ func TestReleaseLock(t *testing.T) {
 				dispatcherId: testDispatcherId,
 			},
 			preconditions: func() {
-				repository.AcquireLock(testDispatcherId)
+				repository.AcquireLock(testDispatcherId) //nolint:all
 			},
 			wantErr: false,
 		},
@@ -428,7 +428,7 @@ func TestFindInBatches(t *testing.T) {
 			},
 			preconditions: func() {
 				for i := 1; i <= 101; i++ {
-					db.Exec(
+					db.Exec( //nolint:all
 						convertToDollarPlaceholder(insertOutboxSql),
 						uuid.New(), "AggregateType", "AggregateId", "EventType", []byte("Payload"))
 				}
@@ -450,13 +450,13 @@ func TestFindInBatches(t *testing.T) {
 			},
 			preconditions: func() {
 				for i := 1; i <= 101; i++ {
-					db.Exec(
+					db.Exec( //nolint:all
 						convertToDollarPlaceholder(insertOutboxSql),
 						uuid.New(), "AggregateType", "AggregateId", "EventType", []byte("Payload"))
 				}
 			},
 			postconditions: func() {
-				db.Exec("DELETE FROM outbox")
+				db.Exec("DELETE FROM outbox") //nolint:all
 			},
 			wantBatches: 5,
 			wantErr:     false,
@@ -633,7 +633,7 @@ func TestDeleteInBatches(t *testing.T) {
 				repo.SetLogger(&gtbx.NopLogger{})
 			}
 			for _, uids := range tc.args.records {
-				db.Exec(
+				db.Exec( //nolint:all
 					convertToDollarPlaceholder(insertOutboxSql),
 					uids, "AggregateType", "AggregateId", "EventType", []byte("Payload"))
 			}
@@ -674,7 +674,7 @@ func TestSubscribeDispatcher(t *testing.T) {
 			},
 			preconditions: func() {
 				for i := 1; i <= 4; i++ {
-					db.Exec(
+					db.Exec( //nolint:all
 						convertToDollarPlaceholder(subscribeDispatcherInsertSql),
 						i, uuid.New(), time.Now())
 				}
@@ -695,7 +695,7 @@ func TestSubscribeDispatcher(t *testing.T) {
 					if i == 2 {
 						now = expired
 					}
-					db.Exec(
+					db.Exec( //nolint:all
 						convertToDollarPlaceholder(subscribeDispatcherInsertSql),
 						i, uuid.New(), now)
 				}
@@ -855,10 +855,10 @@ func TestUpdateSubscription(t *testing.T) {
 				dispatcherId: testDispatcherId,
 			},
 			preconditions: func() {
-				repository.SubscribeDispatcher(testDispatcherId, 1)
+				repository.SubscribeDispatcher(testDispatcherId, 1) //nolint:all
 			},
 			postconditions: func() {
-				db.Exec("DELETE FROM outbox_dispatcher_subscription")
+				db.Exec("DELETE FROM outbox_dispatcher_subscription") //nolint:all
 			},
 			wantUpdated: true,
 			wantErr:     false,
