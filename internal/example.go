@@ -1,7 +1,7 @@
 package main
 
 import (
-	"context"
+	"database/sql"
 	"fmt"
 	"os"
 	"time"
@@ -9,9 +9,9 @@ import (
 	gtbxkfk "github.com/3rs4lg4d0/goutbox/emitter/kafka"
 	"github.com/3rs4lg4d0/goutbox/gtbx"
 	gtbxzrlg "github.com/3rs4lg4d0/goutbox/logger/zerolog"
-	"github.com/3rs4lg4d0/goutbox/repository/pgxv5"
+	gtbxsql "github.com/3rs4lg4d0/goutbox/repository/sql"
 	"github.com/confluentinc/confluent-kafka-go/kafka"
-	"github.com/jackc/pgx/v5/pgxpool"
+	_ "github.com/jackc/pgx/v5/stdlib"
 	"github.com/rs/zerolog"
 )
 
@@ -19,7 +19,7 @@ func main() {
 	p, _ := GetProducer()
 	gtbx.Singleton(gtbx.Settings{
 		EnableDispatcher: true,
-	}, pgxv5.New(struct{}{}, GetDatabasePool()), gtbxkfk.New(p), gtbx.WithLogger(&gtbxzrlg.Logger{
+	}, gtbxsql.New(struct{}{}, GetDatabasePool(), true), gtbxkfk.New(p), gtbx.WithLogger(&gtbxzrlg.Logger{
 		Logger: GetLogger(),
 	}))
 
@@ -50,14 +50,11 @@ func GetProducer() (*kafka.Producer, error) {
 	})
 }
 
-func GetDatabasePool() *pgxpool.Pool {
-	poolConfig, err := pgxpool.ParseConfig("postgresql://goutbox:goutbox@localhost:5432/goutbox?sslmode=disable")
+func GetDatabasePool() *sql.DB {
+	db, err := sql.Open("pgx", "postgresql://goutbox:goutbox@localhost:5432/goutbox?sslmode=disable")
 	if err != nil {
-		panic("Unable to parse database url")
-	}
-	db, err := pgxpool.NewWithConfig(context.Background(), poolConfig)
-	if err != nil {
-		panic("Unable to create connection pool")
+		fmt.Fprintf(os.Stderr, "Unable to connect to database: %v\n", err)
+		os.Exit(1)
 	}
 	return db
 }
