@@ -2,6 +2,7 @@ package kafka
 
 import (
 	"fmt"
+	"reflect"
 	"strconv"
 
 	"github.com/3rs4lg4d0/goutbox/gtbx"
@@ -10,15 +11,20 @@ import (
 )
 
 type Emitter struct {
-	producer *kafka.Producer
+	producer kafkaProducer
 	logger   gtbx.Logger
 }
 
 var _ gtbx.Emitter = (*Emitter)(nil)
 var _ gtbx.Loggable = (*Emitter)(nil)
 
-func New(p *kafka.Producer) *Emitter {
-	if p == nil {
+// kafkaProducer is an internal helper contract to facilitate testing.
+type kafkaProducer interface {
+	Produce(msg *kafka.Message, deliveryChan chan kafka.Event) error
+}
+
+func New(p kafkaProducer) *Emitter {
+	if p == nil || reflect.ValueOf(p).IsNil() {
 		panic("Producer is mandatory")
 	}
 	return &Emitter{
@@ -30,13 +36,13 @@ func (e *Emitter) SetLogger(l gtbx.Logger) {
 	e.logger = l
 }
 
-func (e *Emitter) Emit(o *gtbx.OutboxRecord, dc chan gtbx.DeliveryReport) error {
+func (e *Emitter) Emit(o *gtbx.OutboxRecord, dc chan *gtbx.DeliveryReport) error {
 	var internal = make(chan kafka.Event)
 	go func() {
 		for ev := range internal {
 			switch m := ev.(type) {
 			case *kafka.Message:
-				dc <- gtbx.DeliveryReport{
+				dc <- &gtbx.DeliveryReport{
 					Record: o,
 					Error:  m.TopicPartition.Error,
 					Details: fmt.Sprintf("Delivered message to topic %s [%d] at offset %v\n",

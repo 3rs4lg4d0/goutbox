@@ -81,7 +81,7 @@ func (d *dispatcher) processOutbox() {
 	var success []uuid.UUID
 	var totalProcessed int
 	var totalErr int
-	var deliveryChan = make(chan DeliveryReport, d.settings.MaxEventsPerBatch)
+	var deliveryChan = make(chan *DeliveryReport, d.settings.MaxEventsPerBatch)
 	var wg sync.WaitGroup
 
 	d.logger.Debug("processing outbox messages")

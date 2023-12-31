@@ -11,5 +11,5 @@ type DeliveryReport struct {
 type Emitter interface {
 	// Emit send the information contained in the outbox record to a message
 	// broker in a reliable way.
-	Emit(*OutboxRecord, chan DeliveryReport) error
+	Emit(*OutboxRecord, chan *DeliveryReport) error
 }
