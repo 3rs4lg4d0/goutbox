@@ -38,3 +38,17 @@ type MockedKafkaEvent struct{}
 func (*MockedKafkaEvent) String() string {
 	return "mock"
 }
+
+type TestLogger struct{}
+
+func (*TestLogger) Debug(msg string) {} //nolint:all
+
+func (*TestLogger) Warn(msg string) {} //nolint:all
+
+func (*TestLogger) Error(msg string, err error) {} //nolint:all
+
+func (*TestLogger) Info(msg string) {} //nolint:all
+
+type TestCounter struct{}
+
+func (*TestCounter) Inc(delta int64) {} //nolint:all

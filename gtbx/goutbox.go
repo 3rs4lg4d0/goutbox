@@ -24,26 +24,21 @@ type opt func(o *Goutbox)
 // WithLogger allows clients to configure an optional logger.
 func WithLogger(l Logger) opt {
 	return func(o *Goutbox) {
-		o.logger = l
-	}
-}
-
-// WithOnSuccessCounter allows clients to configure an optional counter
-// for observability.
-func WithOnSuccessCounter(co Counter) opt {
-	return func(o *Goutbox) {
-		if co != nil {
-			o.successCtr = co
+		if l != nil {
+			o.logger = l
 		}
 	}
 }
 
-// WithOnErrorCounter allows clients to configure an optional counter
-// for observability.
-func WithOnErrorCounter(co Counter) opt {
+// WithCounters allows clients to configure optional counters to monitor outbox
+// delivery outcome.
+func WithCounters(successCtr Counter, errorCtr Counter) opt {
 	return func(o *Goutbox) {
-		if co != nil {
-			o.errorCtr = co
+		if successCtr != nil {
+			o.successCtr = successCtr
+		}
+		if errorCtr != nil {
+			o.errorCtr = errorCtr
 		}
 	}
 }

@@ -7,7 +7,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/3rs4lg4d0/goutbox/gtbx"
 	"github.com/DATA-DOG/go-sqlmock"
 	"github.com/google/uuid"
 	"github.com/integralist/go-findroot/find"
@@ -17,7 +16,7 @@ import (
 	"github.com/testcontainers/testcontainers-go/wait"
 )
 
-var DefaultCtxKey gtbx.TxKey = "myKey"
+var DefaultCtxKey any = "myKey"
 
 func AssertError(t *testing.T, err error, expectErr bool) {
 	if expectErr {
