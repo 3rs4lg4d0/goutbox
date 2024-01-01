@@ -37,6 +37,8 @@ jobs:
         with:
           go-version-file: go.mod
           cache-dependency-path: go.sum
+      - name: Generate sources
+        run: go generate ./...
       - name: Build all
         run: go build -v ./...
       - name: Test
