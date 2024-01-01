@@ -21,8 +21,8 @@ const (
 	insertOutboxSql              = "INSERT INTO outbox (id, aggregate_type, aggregate_id, event_type, payload) VALUES (?, ?, ?, ?, ?)"
 	subscribeDispatcherInsertSql = "INSERT INTO outbox_dispatcher_subscription (id, dispatcher_id, alive_at, version) VALUES (?, ?, ?, 1)"
 	subscribeDispatcherUpdateSql = "UPDATE outbox_dispatcher_subscription SET dispatcher_id=?, alive_at=?, version=? WHERE id=? AND version=?"
-	acquireLockSql               = "UPDATE outbox_lock SET locked=true, locked_by=?, locked_at=?, locked_until=?, version=? WHERE version=?"
-	releaseLockSql               = "UPDATE outbox_lock SET locked=false, locked_by=null, locked_at=null, locked_until=null"
+	acquireLockSql               = "UPDATE outbox_lock SET locked=true, locked_by=?, locked_at=?, locked_until=?, version=? WHERE id=1 AND version=?"
+	releaseLockSql               = "UPDATE outbox_lock SET locked=false, locked_by=null, locked_at=null, locked_until=null WHERE id=1"
 	updateSubscriptionSql        = "UPDATE outbox_dispatcher_subscription SET alive_at=NOW() WHERE dispatcher_id=?"
 )
 
