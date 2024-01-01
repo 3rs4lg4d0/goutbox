@@ -117,7 +117,7 @@ func TestNew(t *testing.T) {
 func TestSave(t *testing.T) {
 	type args struct {
 		ctx    context.Context
-		record gtbx.Outbox
+		record gtbx.OutboxRecord
 	}
 	testcases := []struct {
 		name       string
@@ -133,11 +133,14 @@ func TestSave(t *testing.T) {
 					ctx := context.WithValue(context.Background(), test.DefaultCtxKey, tx)
 					return ctx
 				}(),
-				record: gtbx.Outbox{
-					AggregateType: "Restaurant",
-					AggregateId:   "1",
-					EventType:     "RestaurantCreated",
-					Payload:       []byte("payload"),
+				record: gtbx.OutboxRecord{
+					Outbox: gtbx.Outbox{
+						AggregateType: "Restaurant",
+						AggregateId:   "1",
+						EventType:     "RestaurantCreated",
+						Payload:       []byte("payload"),
+					},
+					Id: uuid.New(),
 				},
 			},
 			wantErr: false,
@@ -148,11 +151,14 @@ func TestSave(t *testing.T) {
 				ctx: func() context.Context {
 					return context.Background()
 				}(),
-				record: gtbx.Outbox{
-					AggregateType: "Restaurant",
-					AggregateId:   "1",
-					EventType:     "RestaurantCreated",
-					Payload:       []byte("payload"),
+				record: gtbx.OutboxRecord{
+					Outbox: gtbx.Outbox{
+						AggregateType: "Restaurant",
+						AggregateId:   "1",
+						EventType:     "RestaurantCreated",
+						Payload:       []byte("payload"),
+					},
+					Id: uuid.New(),
 				},
 			},
 			wantErr:    true,
@@ -172,11 +178,14 @@ func TestSave(t *testing.T) {
 					ctx := context.WithValue(context.Background(), test.DefaultCtxKey, tx)
 					return ctx
 				}(),
-				record: gtbx.Outbox{
-					AggregateType: "Restaurant",
-					AggregateId:   "1",
-					EventType:     "RestaurantCreated",
-					Payload:       []byte("payload"),
+				record: gtbx.OutboxRecord{
+					Outbox: gtbx.Outbox{
+						AggregateType: "Restaurant",
+						AggregateId:   "1",
+						EventType:     "RestaurantCreated",
+						Payload:       []byte("payload"),
+					},
+					Id: uuid.New(),
 				},
 			},
 			wantErr:    true,

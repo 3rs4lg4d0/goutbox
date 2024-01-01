@@ -13,7 +13,7 @@ type Repository interface {
 	// Save persists an outbox record in the configured external storage.
 	// This operation should be called inside an existing business transaction
 	// provided in the context.
-	Save(ctx context.Context, o *Outbox) error
+	Save(ctx context.Context, o *OutboxRecord) error
 
 	// AcquireLock gets a lock on the outbox table using optimistic locking.
 	AcquireLock(uuid.UUID) (bool, error)

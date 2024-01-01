@@ -91,5 +91,9 @@ func Singleton(s Settings, r Repository, e Emitter, options ...opt) *Goutbox {
 // Publish publishes a domain event reliably within a business transaction,
 // utilizing the polling publisher variant of the Transactional Outbox pattern.
 func (gb *Goutbox) Publish(ctx context.Context, o *Outbox) error {
-	return gb.repository.Save(ctx, o)
+	or := &OutboxRecord{
+		Outbox: *o,
+		Id:     uuid.New(),
+	}
+	return gb.repository.Save(ctx, or)
 }

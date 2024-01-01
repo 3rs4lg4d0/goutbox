@@ -70,12 +70,12 @@ func (r *Repository) SetLogger(l gtbx.Logger) {
 // Save persist an outbox entry in the same provided business transaction
 // that should be present in the context. The expected transaction should
 // be a pointer to an instance of sql.Tx.
-func (r *Repository) Save(ctx context.Context, o *gtbx.Outbox) error {
+func (r *Repository) Save(ctx context.Context, o *gtbx.OutboxRecord) error {
 	tx, ok := ctx.Value(r.txKey).(*sql.Tx)
 	if !ok {
 		return errors.New("an *sql.Tx transaction was expected")
 	}
-	_, err := tx.ExecContext(ctx, insertOutboxSql, uuid.New(), o.AggregateType, o.AggregateId, o.EventType, o.Payload)
+	_, err := tx.ExecContext(ctx, insertOutboxSql, o.Id, o.AggregateType, o.AggregateId, o.EventType, o.Payload)
 	if err != nil {
 		return fmt.Errorf("could not persist the outbox record: %w", err)
 	}
