@@ -4,25 +4,43 @@ import (
 	"context"
 	"sync"
 
+	"github.com/3rs4lg4d0/goutbox/emitter"
+	"github.com/3rs4lg4d0/goutbox/logger"
+	"github.com/3rs4lg4d0/goutbox/metrics"
+	"github.com/3rs4lg4d0/goutbox/repository"
 	"github.com/google/uuid"
 )
 
 var once sync.Once
 
+var (
+	nopLogger  logger.Logger   = &logger.NopLogger{}
+	nopCounter metrics.Counter = &metrics.NopCounter{}
+)
+
+// Outbox contains high level information about a domain event and should be
+// provided by the clients.
+type Outbox struct {
+	AggregateType string // the aggregate type (e.g. "Restaurant")
+	AggregateId   string // the aggregate identifier
+	EventType     string // the event type (e.g "RestaurantCreated")
+	Payload       []byte // event payload
+}
+
 // Goutbox implements the Goutbox module.
 type Goutbox struct {
-	logger     Logger
-	emitter    Emitter
-	repository Repository
-	successCtr Counter
-	errorCtr   Counter
+	logger     logger.Logger
+	emitter    emitter.Emitter
+	repository repository.Repository
+	successCtr metrics.Counter
+	errorCtr   metrics.Counter
 }
 
 // opt allows optional configuration.
 type opt func(o *Goutbox)
 
 // WithLogger allows clients to configure an optional logger.
-func WithLogger(l Logger) opt {
+func WithLogger(l logger.Logger) opt {
 	return func(o *Goutbox) {
 		if l != nil {
 			o.logger = l
@@ -32,7 +50,7 @@ func WithLogger(l Logger) opt {
 
 // WithCounters allows clients to configure optional counters to monitor outbox
 // delivery outcome.
-func WithCounters(successCtr Counter, errorCtr Counter) opt {
+func WithCounters(successCtr metrics.Counter, errorCtr metrics.Counter) opt {
 	return func(o *Goutbox) {
 		if successCtr != nil {
 			o.successCtr = successCtr
@@ -45,7 +63,7 @@ func WithCounters(successCtr Counter, errorCtr Counter) opt {
 
 // Singleton creates a unique instance of Goutbox using the provided settings
 // and options and the provided Repository and an Emitter implementations.
-func Singleton(s Settings, r Repository, e Emitter, options ...opt) *Goutbox {
+func Singleton(s Settings, r repository.Repository, e emitter.Emitter, options ...opt) *Goutbox {
 	var g *Goutbox
 	once.Do(func() {
 		if e == nil || r == nil {
@@ -54,18 +72,19 @@ func Singleton(s Settings, r Repository, e Emitter, options ...opt) *Goutbox {
 
 		validateSettings(&s)
 		g = &Goutbox{
-			logger:     &NopLogger{},
+			logger:     nopLogger,
 			emitter:    e,
 			repository: r,
-			successCtr: &NopCounter{},
-			errorCtr:   &NopCounter{}}
+			successCtr: nopCounter,
+			errorCtr:   nopCounter,
+		}
 
 		for _, o := range options {
 			o(g)
 		}
 
 		for _, a := range []any{e, r} {
-			if l, ok := a.(Loggable); ok {
+			if l, ok := a.(logger.Loggable); ok {
 				l.SetLogger(g.logger)
 			}
 		}
@@ -91,9 +110,12 @@ func Singleton(s Settings, r Repository, e Emitter, options ...opt) *Goutbox {
 // Publish publishes a domain event reliably within a business transaction,
 // utilizing the polling publisher variant of the Transactional Outbox pattern.
 func (gb *Goutbox) Publish(ctx context.Context, o *Outbox) error {
-	or := &OutboxRecord{
-		Outbox: *o,
-		Id:     uuid.New(),
+	or := &repository.OutboxRecord{
+		Id:            uuid.New(),
+		AggregateType: o.AggregateType,
+		AggregateId:   o.AggregateId,
+		EventType:     o.EventType,
+		Payload:       o.Payload,
 	}
 	return gb.repository.Save(ctx, or)
 }

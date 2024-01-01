@@ -1,4 +1,4 @@
-package gtbx
+package logger
 
 // Logger defines the contract for loggers.
 type Logger interface {

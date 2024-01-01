@@ -5,18 +5,20 @@ import (
 	"reflect"
 	"strconv"
 
-	"github.com/3rs4lg4d0/goutbox/gtbx"
+	"github.com/3rs4lg4d0/goutbox/emitter"
+	"github.com/3rs4lg4d0/goutbox/logger"
+	"github.com/3rs4lg4d0/goutbox/repository"
 	"github.com/confluentinc/confluent-kafka-go/kafka"
 	"github.com/iancoleman/strcase"
 )
 
 type Emitter struct {
 	producer kafkaProducer
-	logger   gtbx.Logger
+	logger   logger.Logger
 }
 
-var _ gtbx.Emitter = (*Emitter)(nil)
-var _ gtbx.Loggable = (*Emitter)(nil)
+var _ emitter.Emitter = (*Emitter)(nil)
+var _ logger.Loggable = (*Emitter)(nil)
 
 // kafkaProducer is an internal helper contract to facilitate testing.
 type kafkaProducer interface {
@@ -32,17 +34,17 @@ func New(p kafkaProducer) *Emitter {
 	}
 }
 
-func (e *Emitter) SetLogger(l gtbx.Logger) {
+func (e *Emitter) SetLogger(l logger.Logger) {
 	e.logger = l
 }
 
-func (e *Emitter) Emit(o *gtbx.OutboxRecord, dc chan *gtbx.DeliveryReport) error {
+func (e *Emitter) Emit(o *repository.OutboxRecord, dc chan *emitter.DeliveryReport) error {
 	var internal = make(chan kafka.Event)
 	go func() {
 		for ev := range internal {
 			switch m := ev.(type) {
 			case *kafka.Message:
-				dc <- &gtbx.DeliveryReport{
+				dc <- &emitter.DeliveryReport{
 					Record: o,
 					Error:  m.TopicPartition.Error,
 					Details: fmt.Sprintf("Delivered message to topic %s [%d] at offset %v\n",

@@ -9,7 +9,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/3rs4lg4d0/goutbox/gtbx"
+	"github.com/3rs4lg4d0/goutbox/logger"
+	"github.com/3rs4lg4d0/goutbox/repository"
 	"github.com/google/uuid"
 )
 
@@ -29,16 +30,16 @@ var (
 )
 
 type Repository struct {
-	txKey     gtbx.TxKey
+	txKey     repository.TxKey
 	db        *sql.DB
 	useDollar bool
-	logger    gtbx.Logger
+	logger    logger.Logger
 }
 
-var _ gtbx.Loggable = (*Repository)(nil)
-var _ gtbx.Repository = (*Repository)(nil)
+var _ logger.Loggable = (*Repository)(nil)
+var _ repository.Repository = (*Repository)(nil)
 
-func New(txKey gtbx.TxKey, db *sql.DB, useDollar bool) *Repository {
+func New(txKey repository.TxKey, db *sql.DB, useDollar bool) *Repository {
 	if txKey == nil {
 		panic("txKey is mandatory")
 	}
@@ -63,14 +64,14 @@ func New(txKey gtbx.TxKey, db *sql.DB, useDollar bool) *Repository {
 }
 
 // SetLogger sets an optional logger.
-func (r *Repository) SetLogger(l gtbx.Logger) {
+func (r *Repository) SetLogger(l logger.Logger) {
 	r.logger = l
 }
 
 // Save persist an outbox entry in the same provided business transaction
 // that should be present in the context. The expected transaction should
 // be a pointer to an instance of sql.Tx.
-func (r *Repository) Save(ctx context.Context, o *gtbx.OutboxRecord) error {
+func (r *Repository) Save(ctx context.Context, o *repository.OutboxRecord) error {
 	tx, ok := ctx.Value(r.txKey).(*sql.Tx)
 	if !ok {
 		return errors.New("an *sql.Tx transaction was expected")
@@ -130,7 +131,7 @@ func (r *Repository) ReleaseLock(dispatcherId uuid.UUID) error {
 }
 
 // FindInBatches restrieves a limited list of outbox entries to be processed in batches.
-func (r *Repository) FindInBatches(batchSize int, limit int, fc func([]*gtbx.OutboxRecord) error) error {
+func (r *Repository) FindInBatches(batchSize int, limit int, fc func([]*repository.OutboxRecord) error) error {
 	var rows *sql.Rows
 	var err error
 
@@ -145,9 +146,9 @@ func (r *Repository) FindInBatches(batchSize int, limit int, fc func([]*gtbx.Out
 	}
 	defer rows.Close()
 
-	var ors []*gtbx.OutboxRecord
+	var ors []*repository.OutboxRecord
 	for rows.Next() {
-		var or gtbx.OutboxRecord
+		var or repository.OutboxRecord
 		err := rows.Scan(&or.Id, &or.AggregateType, &or.AggregateId, &or.EventType, &or.Payload, &or.CreatedAt)
 		if err != nil {
 			return err

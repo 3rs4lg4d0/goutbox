@@ -1,10 +1,24 @@
-package gtbx
+package repository
 
 import (
 	"context"
+	"time"
 
 	"github.com/google/uuid"
 )
+
+type TxKey any
+
+// OutboxRecord contains all the information stored in the underlying outbox
+// table and is used internally.
+type OutboxRecord struct {
+	Id            uuid.UUID
+	AggregateType string
+	AggregateId   string
+	EventType     string
+	Payload       []byte
+	CreatedAt     time.Time
+}
 
 // Repository manages outbox records persistent operations. This interface is
 // the only one the clients need to interact with the module.

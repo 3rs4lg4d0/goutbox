@@ -6,17 +6,21 @@ import (
 	"sync"
 	"time"
 
+	"github.com/3rs4lg4d0/goutbox/emitter"
+	"github.com/3rs4lg4d0/goutbox/logger"
+	"github.com/3rs4lg4d0/goutbox/metrics"
+	"github.com/3rs4lg4d0/goutbox/repository"
 	"github.com/google/uuid"
 )
 
 type dispatcher struct {
 	id         uuid.UUID
 	settings   Settings
-	logger     Logger
-	emitter    Emitter
-	repository Repository
-	successCtr Counter
-	errorCtr   Counter
+	logger     logger.Logger
+	emitter    emitter.Emitter
+	repository repository.Repository
+	successCtr metrics.Counter
+	errorCtr   metrics.Counter
 }
 
 // launchDispatcher starts a subscription loop to attempt the registration of a new dispatcher
@@ -81,7 +85,7 @@ func (d *dispatcher) processOutbox() {
 	var success []uuid.UUID
 	var totalProcessed int
 	var totalErr int
-	var deliveryChan = make(chan *DeliveryReport, d.settings.MaxEventsPerBatch)
+	var deliveryChan = make(chan *emitter.DeliveryReport, d.settings.MaxEventsPerBatch)
 	var wg sync.WaitGroup
 
 	d.logger.Debug("processing outbox messages")
@@ -103,7 +107,7 @@ func (d *dispatcher) processOutbox() {
 		d.logger.Debug("the goroutine for delivery reports has finished")
 	}()
 
-	err := d.repository.FindInBatches(d.settings.MaxEventsPerBatch, d.settings.MaxEventsPerInterval, func(batch []*OutboxRecord) error {
+	err := d.repository.FindInBatches(d.settings.MaxEventsPerBatch, d.settings.MaxEventsPerInterval, func(batch []*repository.OutboxRecord) error {
 		d.logger.Debug(fmt.Sprintf("Sending %d messages to kafka", len(batch)))
 		for _, o := range batch {
 			err := d.emitter.Emit(o, deliveryChan)

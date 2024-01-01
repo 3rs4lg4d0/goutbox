@@ -11,8 +11,6 @@ const (
 	defaultMaxEventsPerBatch    int           = 100
 )
 
-type TxKey any
-
 // Settings holds the general Goutbox module configuration.
 type Settings struct {
 	EnableDispatcher     bool          // enables the dispatcher using the polling publisher pattern

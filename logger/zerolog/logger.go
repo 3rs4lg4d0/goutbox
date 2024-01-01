@@ -1,7 +1,7 @@
 package zerolog
 
 import (
-	"github.com/3rs4lg4d0/goutbox/gtbx"
+	"github.com/3rs4lg4d0/goutbox/logger"
 	"github.com/rs/zerolog"
 )
 
@@ -10,7 +10,7 @@ type Logger struct {
 	Logger zerolog.Logger
 }
 
-var _ gtbx.Logger = (*Logger)(nil)
+var _ logger.Logger = (*Logger)(nil)
 
 func (l *Logger) Debug(msg string) {
 	l.Logger.Debug().Msg(msg)

@@ -9,7 +9,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/3rs4lg4d0/goutbox/gtbx"
+	"github.com/3rs4lg4d0/goutbox/logger"
+	"github.com/3rs4lg4d0/goutbox/repository"
 	"github.com/3rs4lg4d0/goutbox/test"
 	"github.com/DATA-DOG/go-sqlmock"
 	"github.com/google/uuid"
@@ -17,14 +18,14 @@ import (
 	"github.com/stretchr/testify/assert"
 	"gorm.io/driver/postgres"
 	"gorm.io/gorm"
-	"gorm.io/gorm/logger"
+	gormlggr "gorm.io/gorm/logger"
 )
 
 var testDispatcherId uuid.UUID = uuid.New()
 
 var (
-	db         *gorm.DB
-	repository *Repository
+	targetDB         *gorm.DB
+	targetRepository *Repository
 )
 
 // TestMain prepares the database setup needed to run these tests. As you can see
@@ -46,15 +47,15 @@ func TestMain(m *testing.M) {
 		os.Exit(1)
 	}
 
-	db, err = gorm.Open(postgres.Open(dsn), &gorm.Config{
-		Logger: logger.Default.LogMode(logger.Silent),
+	targetDB, err = gorm.Open(postgres.Open(dsn), &gorm.Config{
+		Logger: gormlggr.Default.LogMode(gormlggr.Silent),
 	})
 	if err != nil {
 		panic("failed to connect to database")
 	}
 
-	repository = New(test.DefaultCtxKey, db)
-	repository.SetLogger(&gtbx.NopLogger{})
+	targetRepository = New(test.DefaultCtxKey, targetDB)
+	targetRepository.SetLogger(&logger.NopLogger{})
 
 	code := m.Run()
 
@@ -67,7 +68,7 @@ func TestMain(m *testing.M) {
 
 func TestNew(t *testing.T) {
 	type args struct {
-		txKey gtbx.TxKey
+		txKey repository.TxKey
 		db    *gorm.DB
 	}
 	testcases := []struct {
@@ -79,7 +80,7 @@ func TestNew(t *testing.T) {
 			name: "valid txKey and valid db",
 			args: args{
 				txKey: test.DefaultCtxKey,
-				db:    db,
+				db:    targetDB,
 			},
 			wantPanic: false,
 		},
@@ -117,7 +118,7 @@ func TestNew(t *testing.T) {
 func TestSave(t *testing.T) {
 	type args struct {
 		ctx    context.Context
-		record gtbx.OutboxRecord
+		record repository.OutboxRecord
 	}
 	testcases := []struct {
 		name       string
@@ -129,18 +130,16 @@ func TestSave(t *testing.T) {
 			name: "valid context and valid record",
 			args: args{
 				ctx: func() context.Context {
-					tx := db.Begin()
+					tx := targetDB.Begin()
 					ctx := context.WithValue(context.Background(), test.DefaultCtxKey, tx)
 					return ctx
 				}(),
-				record: gtbx.OutboxRecord{
-					Outbox: gtbx.Outbox{
-						AggregateType: "Restaurant",
-						AggregateId:   "1",
-						EventType:     "RestaurantCreated",
-						Payload:       []byte("payload"),
-					},
-					Id: uuid.New(),
+				record: repository.OutboxRecord{
+					Id:            uuid.New(),
+					AggregateType: "Restaurant",
+					AggregateId:   "1",
+					EventType:     "RestaurantCreated",
+					Payload:       []byte("payload"),
 				},
 			},
 			wantErr: false,
@@ -151,14 +150,12 @@ func TestSave(t *testing.T) {
 				ctx: func() context.Context {
 					return context.Background()
 				}(),
-				record: gtbx.OutboxRecord{
-					Outbox: gtbx.Outbox{
-						AggregateType: "Restaurant",
-						AggregateId:   "1",
-						EventType:     "RestaurantCreated",
-						Payload:       []byte("payload"),
-					},
-					Id: uuid.New(),
+				record: repository.OutboxRecord{
+					Id:            uuid.New(),
+					AggregateType: "Restaurant",
+					AggregateId:   "1",
+					EventType:     "RestaurantCreated",
+					Payload:       []byte("payload"),
 				},
 			},
 			wantErr:    true,
@@ -178,14 +175,12 @@ func TestSave(t *testing.T) {
 					ctx := context.WithValue(context.Background(), test.DefaultCtxKey, tx)
 					return ctx
 				}(),
-				record: gtbx.OutboxRecord{
-					Outbox: gtbx.Outbox{
-						AggregateType: "Restaurant",
-						AggregateId:   "1",
-						EventType:     "RestaurantCreated",
-						Payload:       []byte("payload"),
-					},
-					Id: uuid.New(),
+				record: repository.OutboxRecord{
+					Id:            uuid.New(),
+					AggregateType: "Restaurant",
+					AggregateId:   "1",
+					EventType:     "RestaurantCreated",
+					Payload:       []byte("payload"),
 				},
 			},
 			wantErr:    true,
@@ -196,7 +191,7 @@ func TestSave(t *testing.T) {
 	for _, tc := range testcases {
 		t.Run(tc.name, func(t *testing.T) {
 			ctx := tc.args.ctx
-			err := repository.Save(ctx, &tc.args.record)
+			err := targetRepository.Save(ctx, &tc.args.record)
 			if !tc.wantErr {
 				assert.NoError(t, err)
 			} else {
@@ -242,10 +237,10 @@ func TestAcquireLock(t *testing.T) {
 				dispatcherId: uuid.New(),
 			},
 			preconditions: func() {
-				repository.AcquireLock(testDispatcherId) //nolint:all
+				targetRepository.AcquireLock(testDispatcherId) //nolint:all
 			},
 			postconditions: func() {
-				repository.ReleaseLock(testDispatcherId) //nolint:all
+				targetRepository.ReleaseLock(testDispatcherId) //nolint:all
 			},
 			wantAcquired: false,
 			wantErr:      false,
@@ -292,7 +287,7 @@ func TestAcquireLock(t *testing.T) {
 	}
 	for _, tc := range testcases {
 		t.Run(tc.name, func(t *testing.T) {
-			repo := repository
+			repo := targetRepository
 			if tc.preconditions != nil {
 				tc.preconditions()
 			}
@@ -338,7 +333,7 @@ func TestReleaseLock(t *testing.T) {
 				dispatcherId: testDispatcherId,
 			},
 			preconditions: func() {
-				repository.AcquireLock(testDispatcherId) //nolint:all
+				targetRepository.AcquireLock(testDispatcherId) //nolint:all
 			},
 			wantErr: false,
 		},
@@ -377,7 +372,7 @@ func TestReleaseLock(t *testing.T) {
 	}
 	for _, tc := range testcases {
 		t.Run(tc.name, func(t *testing.T) {
-			repo := repository
+			repo := targetRepository
 			if tc.preconditions != nil {
 				tc.preconditions()
 			}
@@ -401,7 +396,7 @@ func TestFindInBatches(t *testing.T) {
 	type args struct {
 		batchSize int
 		limit     int
-		fcBuilder func(*int) func([]*gtbx.OutboxRecord) error
+		fcBuilder func(*int) func([]*repository.OutboxRecord) error
 	}
 	testcases := []struct {
 		name             string
@@ -418,8 +413,8 @@ func TestFindInBatches(t *testing.T) {
 			args: args{
 				batchSize: 10,
 				limit:     -1, // unlimited
-				fcBuilder: func(ctr *int) func([]*gtbx.OutboxRecord) error {
-					return func([]*gtbx.OutboxRecord) error {
+				fcBuilder: func(ctr *int) func([]*repository.OutboxRecord) error {
+					return func([]*repository.OutboxRecord) error {
 						*ctr++
 						return nil
 					}
@@ -427,7 +422,7 @@ func TestFindInBatches(t *testing.T) {
 			},
 			preconditions: func() {
 				for i := 1; i <= 101; i++ {
-					db.Exec(
+					targetDB.Exec(
 						insertOutboxSql,
 						uuid.New(), "AggregateType", "AggregateId", "EventType", []byte("Payload"))
 				}
@@ -440,8 +435,8 @@ func TestFindInBatches(t *testing.T) {
 			args: args{
 				batchSize: 10,
 				limit:     50,
-				fcBuilder: func(ctr *int) func([]*gtbx.OutboxRecord) error {
-					return func([]*gtbx.OutboxRecord) error {
+				fcBuilder: func(ctr *int) func([]*repository.OutboxRecord) error {
+					return func([]*repository.OutboxRecord) error {
 						*ctr++
 						return nil
 					}
@@ -449,13 +444,13 @@ func TestFindInBatches(t *testing.T) {
 			},
 			preconditions: func() {
 				for i := 1; i <= 101; i++ {
-					db.Exec(
+					targetDB.Exec(
 						insertOutboxSql,
 						uuid.New(), "AggregateType", "AggregateId", "EventType", []byte("Payload"))
 				}
 			},
 			postconditions: func() {
-				db.Exec("DELETE FROM outbox")
+				targetDB.Exec("DELETE FROM outbox")
 			},
 			wantBatches: 5,
 			wantErr:     false,
@@ -465,8 +460,8 @@ func TestFindInBatches(t *testing.T) {
 			args: args{
 				batchSize: 10,
 				limit:     50,
-				fcBuilder: func(ctr *int) func([]*gtbx.OutboxRecord) error {
-					return func([]*gtbx.OutboxRecord) error {
+				fcBuilder: func(ctr *int) func([]*repository.OutboxRecord) error {
+					return func([]*repository.OutboxRecord) error {
 						*ctr++
 						return nil
 					}
@@ -483,8 +478,8 @@ func TestFindInBatches(t *testing.T) {
 			args: args{
 				batchSize: 10,
 				limit:     -1,
-				fcBuilder: func(ctr *int) func([]*gtbx.OutboxRecord) error {
-					return func([]*gtbx.OutboxRecord) error {
+				fcBuilder: func(ctr *int) func([]*repository.OutboxRecord) error {
+					return func([]*repository.OutboxRecord) error {
 						*ctr++
 						return nil
 					}
@@ -502,8 +497,8 @@ func TestFindInBatches(t *testing.T) {
 			args: args{
 				batchSize: 2,
 				limit:     -1,
-				fcBuilder: func(ctr *int) func([]*gtbx.OutboxRecord) error {
-					return func([]*gtbx.OutboxRecord) error {
+				fcBuilder: func(ctr *int) func([]*repository.OutboxRecord) error {
+					return func([]*repository.OutboxRecord) error {
 						return errors.New("error#7")
 					}
 				},
@@ -519,8 +514,8 @@ func TestFindInBatches(t *testing.T) {
 			args: args{
 				batchSize: 10,
 				limit:     -1,
-				fcBuilder: func(ctr *int) func([]*gtbx.OutboxRecord) error {
-					return func([]*gtbx.OutboxRecord) error {
+				fcBuilder: func(ctr *int) func([]*repository.OutboxRecord) error {
+					return func([]*repository.OutboxRecord) error {
 						*ctr++
 						return nil
 					}
@@ -538,8 +533,8 @@ func TestFindInBatches(t *testing.T) {
 			args: args{
 				batchSize: 2,
 				limit:     -1,
-				fcBuilder: func(ctr *int) func([]*gtbx.OutboxRecord) error {
-					return func([]*gtbx.OutboxRecord) error {
+				fcBuilder: func(ctr *int) func([]*repository.OutboxRecord) error {
+					return func([]*repository.OutboxRecord) error {
 						*ctr++
 						if *ctr == 2 {
 							return errors.New("error#9")
@@ -558,7 +553,7 @@ func TestFindInBatches(t *testing.T) {
 	}
 	for _, tc := range testcases {
 		t.Run(tc.name, func(t *testing.T) {
-			repo := repository
+			repo := targetRepository
 			if tc.preconditions != nil {
 				tc.preconditions()
 			}
@@ -629,7 +624,7 @@ func TestDeleteInBatches(t *testing.T) {
 	}
 	for _, tc := range testcases {
 		t.Run(tc.name, func(t *testing.T) {
-			repo := repository
+			repo := targetRepository
 			if tc.mockExpectations != nil {
 				var mock sqlmock.Sqlmock
 				repo, mock = createSqlMockRepository()
@@ -637,7 +632,7 @@ func TestDeleteInBatches(t *testing.T) {
 			}
 			if !tc.wantErr {
 				for _, uids := range tc.args.records {
-					db.Exec(
+					targetDB.Exec(
 						insertOutboxSql,
 						uids, "AggregateType", "AggregateId", "EventType", []byte("Payload"))
 				}
@@ -679,7 +674,7 @@ func TestSubscribeDispatcher(t *testing.T) {
 			},
 			preconditions: func() {
 				for i := 1; i <= 4; i++ {
-					db.Exec(
+					targetDB.Exec(
 						subscribeDispatcherInsertSql,
 						i, uuid.New(), time.Now())
 				}
@@ -700,7 +695,7 @@ func TestSubscribeDispatcher(t *testing.T) {
 					if i == 2 {
 						now = expired
 					}
-					db.Exec(
+					targetDB.Exec(
 						subscribeDispatcherInsertSql,
 						i, uuid.New(), now)
 				}
@@ -796,7 +791,7 @@ func TestSubscribeDispatcher(t *testing.T) {
 	}
 	for _, tc := range testcases {
 		t.Run(tc.name, func(t *testing.T) {
-			repo := repository
+			repo := targetRepository
 			if tc.preconditions != nil {
 				tc.preconditions()
 			}
@@ -816,7 +811,7 @@ func TestSubscribeDispatcher(t *testing.T) {
 			}
 
 			// Cleanup before the next test case is executed.
-			res := db.Exec("DELETE FROM outbox_dispatcher_subscription")
+			res := targetDB.Exec("DELETE FROM outbox_dispatcher_subscription")
 			if res.Error != nil {
 				t.Fatal(res.Error)
 			}
@@ -844,10 +839,10 @@ func TestUpdateSubscription(t *testing.T) {
 				dispatcherId: testDispatcherId,
 			},
 			preconditions: func() {
-				repository.SubscribeDispatcher(testDispatcherId, 1) //nolint:all
+				targetRepository.SubscribeDispatcher(testDispatcherId, 1) //nolint:all
 			},
 			postconditions: func() {
-				db.Exec("DELETE FROM outbox_dispatcher_subscription")
+				targetDB.Exec("DELETE FROM outbox_dispatcher_subscription")
 			},
 			wantUpdated: true,
 			wantErr:     false,
@@ -875,7 +870,7 @@ func TestUpdateSubscription(t *testing.T) {
 	}
 	for _, tc := range testcases {
 		t.Run(tc.name, func(t *testing.T) {
-			repo := repository
+			repo := targetRepository
 			if tc.preconditions != nil {
 				tc.preconditions()
 			}
@@ -905,6 +900,6 @@ func createSqlMockRepository() (*Repository, sqlmock.Sqlmock) {
 		Conn: db,
 	}), &gorm.Config{})
 	repository := New(test.DefaultCtxKey, gormDB)
-	repository.SetLogger(&gtbx.NopLogger{})
+	repository.SetLogger(&logger.NopLogger{})
 	return repository, mock
 }

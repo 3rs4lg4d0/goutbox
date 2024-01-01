@@ -6,7 +6,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/3rs4lg4d0/goutbox/gtbx"
+	"github.com/3rs4lg4d0/goutbox/emitter"
+	"github.com/3rs4lg4d0/goutbox/logger"
+	"github.com/3rs4lg4d0/goutbox/repository"
 	"github.com/3rs4lg4d0/goutbox/test"
 	"github.com/confluentinc/confluent-kafka-go/kafka"
 	"github.com/google/uuid"
@@ -56,7 +58,7 @@ func TestNew(t *testing.T) {
 			} else {
 				assert.NotPanics(t, func() {
 					e := New(tc.args.producer)
-					e.SetLogger(&gtbx.NopLogger{})
+					e.SetLogger(&logger.NopLogger{})
 				})
 			}
 		})
@@ -69,10 +71,10 @@ func TestEmit(t *testing.T) {
 	snitch := make(chan *kafka.Message, 1)
 	type fields struct {
 		producer kafkaProducer
-		logger   gtbx.Logger
+		logger   logger.Logger
 	}
 	type args struct {
-		o *gtbx.OutboxRecord
+		o *repository.OutboxRecord
 	}
 	testcases := []struct {
 		name       string
@@ -90,18 +92,16 @@ func TestEmit(t *testing.T) {
 					MockedReportToSend: &test.MockedKafkaEvent{},
 					RetVal:             nil,
 				},
-				logger: &gtbx.NopLogger{},
+				logger: &logger.NopLogger{},
 			},
 			args: args{
-				o: &gtbx.OutboxRecord{
-					Outbox: gtbx.Outbox{
-						AggregateType: "aggregateType",
-						AggregateId:   "aggregateID",
-						EventType:     "eventType",
-						Payload:       []byte("payload"),
-					},
-					Id:        testMsgId,
-					CreatedAt: testCreatedAt,
+				o: &repository.OutboxRecord{
+					Id:            testMsgId,
+					AggregateType: "aggregateType",
+					AggregateId:   "aggregateID",
+					EventType:     "eventType",
+					Payload:       []byte("payload"),
+					CreatedAt:     testCreatedAt,
 				},
 			},
 			wantMsg: func() *kafka.Message {
@@ -138,18 +138,16 @@ func TestEmit(t *testing.T) {
 					}(),
 					RetVal: nil,
 				},
-				logger: &gtbx.NopLogger{},
+				logger: &logger.NopLogger{},
 			},
 			args: args{
-				o: &gtbx.OutboxRecord{
-					Outbox: gtbx.Outbox{
-						AggregateType: "aggregateType",
-						AggregateId:   "aggregateID",
-						EventType:     "eventType",
-						Payload:       []byte("payload"),
-					},
-					Id:        testMsgId,
-					CreatedAt: testCreatedAt,
+				o: &repository.OutboxRecord{
+					Id:            testMsgId,
+					AggregateType: "aggregateType",
+					AggregateId:   "aggregateID",
+					EventType:     "eventType",
+					Payload:       []byte("payload"),
+					CreatedAt:     testCreatedAt,
 				},
 			},
 			wantMsg: func() *kafka.Message {
@@ -175,18 +173,16 @@ func TestEmit(t *testing.T) {
 					MockedReportToSend: &test.MockedKafkaEvent{},
 					RetVal:             errors.New("error"),
 				},
-				logger: &gtbx.NopLogger{},
+				logger: &logger.NopLogger{},
 			},
 			args: args{
-				o: &gtbx.OutboxRecord{
-					Outbox: gtbx.Outbox{
-						AggregateType: "aggregateType",
-						AggregateId:   "aggregateID",
-						EventType:     "eventType",
-						Payload:       []byte("payload"),
-					},
-					Id:        testMsgId,
-					CreatedAt: testCreatedAt,
+				o: &repository.OutboxRecord{
+					Id:            testMsgId,
+					AggregateType: "aggregateType",
+					AggregateId:   "aggregateID",
+					EventType:     "eventType",
+					Payload:       []byte("payload"),
+					CreatedAt:     testCreatedAt,
 				},
 			},
 			wantMsg: func() *kafka.Message {
@@ -212,12 +208,12 @@ func TestEmit(t *testing.T) {
 				logger:   tc.fields.logger,
 			}
 
-			dc := make(chan *gtbx.DeliveryReport, 1)
+			dc := make(chan *emitter.DeliveryReport, 1)
 			err := e.Emit(tc.args.o, dc)
 			msg := <-snitch
 
 			assert.Equal(t, tc.wantMsg, msg)
-			var report *gtbx.DeliveryReport
+			var report *emitter.DeliveryReport
 			select {
 			case <-time.After(time.Second):
 			case report = <-dc:

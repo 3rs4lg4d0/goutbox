@@ -1,4 +1,4 @@
-package gtbx
+package metrics
 
 // Counter defines the contract for counters.
 type Counter interface {
