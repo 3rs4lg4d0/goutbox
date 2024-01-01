@@ -57,11 +57,7 @@ func Singleton(s Settings, r Repository, e Emitter, options ...opt) *Goutbox {
 			panic("you must provide an emitter and a repository")
 		}
 
-		err := validateSettings(&s)
-		if err != nil {
-			panic(err)
-		}
-
+		validateSettings(&s)
 		g = &Goutbox{
 			logger:     &NopLogger{},
 			emitter:    e,

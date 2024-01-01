@@ -23,7 +23,7 @@ type Settings struct {
 }
 
 // ValidateSettings validate the stablished settings and sets defaults if needed.
-func validateSettings(s *Settings) error {
+func validateSettings(s *Settings) {
 	if s.EnableDispatcher {
 		if s.MaxDispatchers <= 0 {
 			s.MaxDispatchers = defaultMaxDispatchers
@@ -31,13 +31,11 @@ func validateSettings(s *Settings) error {
 		if s.PollingInterval <= 0 {
 			s.PollingInterval = defaultPollingInterval
 		}
-		if s.MaxEventsPerInterval == 0 {
+		if s.MaxEventsPerInterval == 0 || s.MaxEventsPerInterval < -1 {
 			s.MaxEventsPerInterval = defaultMaxEventsPerInterval
 		}
 		if s.MaxEventsPerBatch <= 0 {
 			s.MaxEventsPerBatch = defaultMaxEventsPerBatch
 		}
 	}
-
-	return nil
 }
