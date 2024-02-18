@@ -1,0 +1,17 @@
+with-expecter: true
+dir: .
+outpkg: mocks
+filename: "{{.InterfaceName}}_mock.go"
+packages:
+    github.com/3rs4lg4d0/goutbox/emitter:
+        interfaces:
+            Emitter:
+    github.com/3rs4lg4d0/goutbox/logger:
+        interfaces:
+            Logger:
+    github.com/3rs4lg4d0/goutbox/metrics:
+        interfaces:
+            Counter:
+    github.com/3rs4lg4d0/goutbox/repository:
+        interfaces:
+            Repository:

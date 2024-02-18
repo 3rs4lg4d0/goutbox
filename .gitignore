@@ -21,3 +21,6 @@
 *.out
 *.html
 
+# Ignore generated mock files
+**/*_mock.go
+
