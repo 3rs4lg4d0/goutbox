@@ -37,13 +37,13 @@ type Goutbox struct {
 }
 
 // opt allows optional configuration.
-type opt func(o *Goutbox)
+type opt func(g *Goutbox)
 
 // WithLogger allows clients to configure an optional logger.
 func WithLogger(l logger.Logger) opt {
-	return func(o *Goutbox) {
+	return func(g *Goutbox) {
 		if l != nil {
-			o.logger = l
+			g.logger = l
 		}
 	}
 }
@@ -51,12 +51,12 @@ func WithLogger(l logger.Logger) opt {
 // WithCounters allows clients to configure optional counters to monitor outbox
 // delivery outcome.
 func WithCounters(successCtr metrics.Counter, errorCtr metrics.Counter) opt {
-	return func(o *Goutbox) {
+	return func(g *Goutbox) {
 		if successCtr != nil {
-			o.successCtr = successCtr
+			g.successCtr = successCtr
 		}
 		if errorCtr != nil {
-			o.errorCtr = errorCtr
+			g.errorCtr = errorCtr
 		}
 	}
 }
@@ -109,7 +109,10 @@ func Singleton(s Settings, r repository.Repository, e emitter.Emitter, options .
 
 // Publish publishes a domain event reliably within a business transaction,
 // utilizing the polling publisher variant of the Transactional Outbox pattern.
-func (gb *Goutbox) Publish(ctx context.Context, o *Outbox) error {
+// An opened database transaction is expected to be in the provided context. Take
+// a look to the different repository implementations to see the expected transaction
+// type in each case.
+func (g *Goutbox) Publish(ctx context.Context, o *Outbox) error {
 	or := &repository.OutboxRecord{
 		Id:            uuid.New(),
 		AggregateType: o.AggregateType,
@@ -117,5 +120,5 @@ func (gb *Goutbox) Publish(ctx context.Context, o *Outbox) error {
 		EventType:     o.EventType,
 		Payload:       o.Payload,
 	}
-	return gb.repository.Save(ctx, or)
+	return g.repository.Save(ctx, or)
 }
