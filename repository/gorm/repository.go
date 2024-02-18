@@ -81,7 +81,7 @@ func (r *Repository) AcquireLock(dispatcherId uuid.UUID) (bool, error) {
 		return false, nil
 	}
 	lockedAt := time.Now()
-	lockedUntil := lockedAt.Add(30 * time.Second)
+	lockedUntil := lockedAt.Add(repository.LockMaxDuration)
 	res := r.db.Exec(acquireLockSql, dispatcherId, lockedAt, lockedUntil, lock.Version+1, lock.Version)
 	if res.Error != nil {
 		return false, res.Error
@@ -259,7 +259,7 @@ func allocateSubscription(dss []dispatcherSubscription) (int, *dispatcherSubscri
 // isExpired considers expired the subscriptions whose dispatcher last aliveAt mark
 // is above 30 seconds from current time.
 func isExpired(ds dispatcherSubscription) bool {
-	return ds.AliveAt.Time.Add(time.Second * 30).Before(time.Now())
+	return ds.AliveAt.Time.Add(repository.SubsExpirationAfter).Before(time.Now())
 }
 
 // getOutboxLockRow returns the only 'outbox_lock' table row.
