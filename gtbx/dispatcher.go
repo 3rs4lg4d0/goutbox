@@ -1,6 +1,7 @@
 package gtbx
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"sync"
@@ -12,6 +13,8 @@ import (
 	"github.com/3rs4lg4d0/goutbox/repository"
 	"github.com/google/uuid"
 )
+
+const defaultSubscriptionLoopInterval = time.Second * 10
 
 type dispatcher struct {
 	id         uuid.UUID
@@ -25,17 +28,19 @@ type dispatcher struct {
 
 // launchDispatcher starts a subscription loop to attempt the registration of a new dispatcher
 // within the 'outbox_dispatcher_subscription'. Only subscribed dispatchers can deliver
-// outbox entries to the configured emitter. The function also ensures the consistent updating
+// outbox entries to the configured emitter. The function also ensures the recurrent updating
 // of the "alive_at" column to avoid losing the dispatcher subscription.
 func (d *dispatcher) launchDispatcher() {
-	ticker := time.NewTicker(10 * time.Second)
+	ticker := time.NewTicker(defaultSubscriptionLoopInterval)
 	defer ticker.Stop()
 	subscribed := false
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
 	for ; true; <-ticker.C {
 		if !subscribed {
 			if success, subscription, err := d.repository.SubscribeDispatcher(d.id, d.settings.MaxDispatchers); success {
 				d.logger.Debug(fmt.Sprintf("subscription '%d' assigned to dispatcher '%s'", subscription, d.id))
-				go d.executeDispatcherLoop()
+				go d.executeDispatcherLoop(ctx)
 				subscribed = true
 			} else if err != nil {
 				d.logger.Error(fmt.Sprintf("trying to subscribe dispatcher '%s'", d.id), err)
@@ -47,23 +52,31 @@ func (d *dispatcher) launchDispatcher() {
 			} else if !updated {
 				d.logger.Error("subscription not updated", errors.New("stolen subscription!"))
 				subscribed = false
+				cancel()
 			}
 		}
 	}
 }
 
-// executeDispatcherLoop implements the main dispatcher loop.
-func (d *dispatcher) executeDispatcherLoop() {
+// executeDispatcherLoop implements the main dispatcher loop. The dispatcher loop
+// executes until the provided context is done (wich happens only when a dispatcher
+// subscription is stolen by other dispatcher).
+func (d *dispatcher) executeDispatcherLoop(ctx context.Context) {
 	ticker := time.NewTicker(d.settings.PollingInterval)
 	for ; true; <-ticker.C {
-		if acquired, err := d.acquireOutboxLock(); acquired {
-			d.processOutbox()
-			err := d.releaseOutboxLock()
-			if err != nil {
-				d.logger.Error("releasing the outbox lock", err)
+		select {
+		case <-ctx.Done():
+			return
+		default:
+			if acquired, err := d.acquireOutboxLock(); acquired {
+				d.processOutbox()
+				err := d.releaseOutboxLock()
+				if err != nil {
+					d.logger.Error("releasing the outbox lock", err)
+				}
+			} else if err != nil {
+				d.logger.Error("unable to get the lock", err)
 			}
-		} else if err != nil {
-			d.logger.Error("unable to get the lock", err)
 		}
 	}
 }
